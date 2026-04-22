@@ -5,7 +5,8 @@ const kitSchema = new mongoose.Schema({
     description: String,
     image: String,
     items: [String],
-    category: { type: String, default: 'Onboarding' }
+    category: { type: String, default: 'Onboarding' },
+    order: { type: Number, default: 0 }
 });
 
 module.exports = mongoose.model('Kit', kitSchema);

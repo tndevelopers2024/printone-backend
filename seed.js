@@ -5,36 +5,80 @@ const Employee = require('./models/Employee');
 const Kit = require('./models/Kit');
 
 const employees = [
-    { name: 'John Doe', employeeId: 'TA101', dob: '1990-01-01', company: 'Tiger Analytics' },
-    { name: 'Jane Smith', employeeId: 'TA102', dob: '1992-05-15', company: 'Tiger Analytics' },
-    { name: 'Alex Johnson', employeeId: 'TA103', dob: '1988-11-20', company: 'Tiger Analytics' },
-    { name: 'Emily Watson', employeeId: 'TA104', dob: '1995-03-10', company: 'Tiger Analytics' }
+    { name: 'John Doe', email: 'john.doe@tiger.com', dob: '1990-01-01', company: 'Tiger Analytics' },
+    { name: 'Jane Smith', email: 'jane.smith@tiger.com', dob: '1992-05-15', company: 'Tiger Analytics' },
+    { name: 'Alex Johnson', email: 'alex.j@tiger.com', dob: '1988-11-20', company: 'Tiger Analytics' },
+    { name: 'Emily Watson', email: 'emily.w@tiger.com', dob: '1995-03-10', company: 'Tiger Analytics' }
 ];
 
 const kits = [
+    // Standard Essentials (Locked)
     { 
-        title: 'Executive Welcome Pack', 
-        description: 'Luxury essentials for our leadership team.', 
-        items: ['Hardbound Notebook', 'Cross Desktop Pen', 'Premium Leather Folder', 'Stainless Steel Bottle'],
-        image: 'https://images.unsplash.com/photo-1544391496-1ca7c97493c3?q=80&w=400&h=300&auto=format&fit=crop'
+        title: 'Message Inserts', 
+        category: 'Standard',
+        order: 1,
+        image: '/images/image.png',
+        items: ['Welcome Note', 'Company Values', 'Contact Information']
     },
     { 
-        title: 'Elite Developer Suite', 
-        description: 'High-performance gear for our technical architects.', 
-        items: ['Mechanical Keyboard', 'Ergonomic Vertical Mouse', 'Noise-Cancelling Headphones', 'Laptop Stand'],
-        image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?q=80&w=400&h=300&auto=format&fit=crop'
+        title: 'Lanyard with dual card holder', 
+        category: 'Standard',
+        order: 2,
+        image: '/images/image2.png',
+        items: ['Premium Lanyard', 'Dual Card Holder', 'Tiger Branding']
     },
     { 
-        title: 'Modern Nomad Kit', 
-        description: 'Everything you need for a flexible, hybrid workspace.', 
-        items: ['Tech Organizer Bag', 'PD Fast Charger', 'Convertible Laptop Sleeve', 'Matte Finish Mug'],
-        image: 'https://images.unsplash.com/photo-1544391496-1ca7c97493c3?q=80&w=400&h=300&auto=format&fit=crop'
+        title: 'Eco Sticky Note Pad with Ball Pen', 
+        category: 'Standard',
+        order: 3,
+        image: '/images/image3.png',
+        items: ['Recycled Paper', 'Eco-friendly Pen', 'Multiple Sizes']
     },
     { 
-        title: 'Vitality Wellness Box', 
-        description: 'Fuel your workday with focus and hydration.', 
-        items: ['Insulated Flask', 'Healthy Snack Selection', 'Desk Succulent', 'Microfiber Screen Cleaner'],
-        image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?q=80&w=400&h=300&auto=format&fit=crop'
+        title: 'Jack and Jones Plain Polo T-shirt', 
+        category: 'Standard',
+        order: 4,
+        image: '/images/image4.png',
+        items: ['100% Cotton', 'Classic Fit', 'Embroidered Logo']
+    },
+
+    // Professional Upgrade (Choice A)
+    { 
+        title: 'Stainless Steel Sipper Bottle with Filter', 
+        category: 'Choice_A',
+        order: 5,
+        image: '/images/image5.png',
+        items: ['Double Wall', 'Built-in Filter', 'BPA Free']
+    },
+    { 
+        title: 'Customized Desk Mat', 
+        category: 'Choice_A',
+        order: 6,
+        image: '/images/image6.png',
+        items: ['Large Surface', 'Non-slip Base', 'Custom Design']
+    },
+    { 
+        title: 'Portable Laptop Stand', 
+        category: 'Choice_A',
+        order: 7,
+        image: '/images/image7.png',
+        items: ['Adjustable Height', 'Foldable Design', 'Aluminum Alloy']
+    },
+
+    // Premium Carry (Choice B)
+    { 
+        title: 'Emmi Backpack', 
+        category: 'Choice_B',
+        order: 8,
+        image: '/images/image8.png',
+        items: ['Water Resistant', 'Laptop Compartment', 'Ergonomic Straps']
+    },
+    { 
+        title: 'Laptop Messenger Leather Bag', 
+        category: 'Choice_B',
+        order: 9,
+        image: '/images/image9.png',
+        items: ['Genuine Leather', 'Premium Lining', 'Secure Buckles']
     }
 ];
 
@@ -45,7 +89,12 @@ const seed = async () => {
         console.log('✅ Connected to MongoDB');
 
         console.log('Cleaning existing data...');
-        await Employee.deleteMany({});
+        try {
+            await mongoose.connection.db.dropCollection('employees');
+            console.log('🗑️ Dropped employees collection');
+        } catch (e) {
+            console.log('ℹ️ Employees collection not found, skipping drop');
+        }
         await Kit.deleteMany({});
 
         console.log('Seeding employees...');
