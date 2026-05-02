@@ -19,6 +19,14 @@ const orderSchema = new mongoose.Schema({
         selectedSize: String
     }],
     status: { type: String, default: 'Pending' },
+    statusHistory: [{
+        status: String,
+        updatedAt: { type: Date, default: Date.now }
+    }],
+    isDelivered: { type: Boolean, default: false },
+    trackingLink: { type: String },
+    deliveryConfirmationSent: { type: Boolean, default: false },
+    nonReceiptReported: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 
