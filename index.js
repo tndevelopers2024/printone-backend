@@ -49,6 +49,75 @@ app.post('/api/admin/login', (req, res) => {
     }
 });
 
+// Address Parser Helper
+const parseAddress = (addrStr) => {
+    if (!addrStr) return { doorNo: '', street: '', address: '', city: '', pincode: '' };
+    
+    // Match pincode (6-digit number)
+    const pinMatch = addrStr.match(/\b\d{6}\b/);
+    const pincode = pinMatch ? pinMatch[0] : '';
+    
+    // Clean string by removing pincode
+    let cleanStr = addrStr.replace(/\b\d{6}\b/, '').trim();
+    // Remove trailing/leading commas or spaces
+    cleanStr = cleanStr.replace(/^,+|,+$/g, '').trim();
+    
+    const parts = cleanStr.split(',').map(p => p.trim()).filter(Boolean);
+    
+    let doorNo = '';
+    let city = '';
+    let street = '';
+    
+    if (parts.length > 0) {
+        doorNo = parts[0];
+    }
+    
+    const countries = ['india', 'us', 'usa', 'united states'];
+    const states = ['haryana', 'karnataka', 'tamil nadu', 'telangana', 'maharashtra', 'delhi', 'up', 'uttar pradesh', 'andhra pradesh'];
+    
+    let countryIndex = -1;
+    let stateIndex = -1;
+    
+    for (let i = parts.length - 1; i >= 0; i--) {
+        const lower = parts[i].toLowerCase();
+        if (countries.includes(lower) && countryIndex === -1) {
+            countryIndex = i;
+        } else if (states.includes(lower) && stateIndex === -1) {
+            stateIndex = i;
+        }
+    }
+    
+    if (stateIndex > 0) {
+        city = parts[stateIndex - 1];
+    } else if (countryIndex > 1) {
+        city = parts[countryIndex - 2];
+    } else if (parts.length > 1) {
+        city = parts[parts.length - 1];
+    }
+    
+    let streetParts = [];
+    const startIndex = 1;
+    const endIndex = parts.indexOf(city) !== -1 ? parts.indexOf(city) : parts.length - 1;
+    
+    for (let i = startIndex; i < endIndex; i++) {
+        streetParts.push(parts[i]);
+    }
+    
+    street = streetParts.join(', ');
+    
+    if (!street && parts.length > 2) {
+        street = parts[1];
+    }
+    
+    return {
+        doorNo,
+        street: street || parts.slice(1, -1).join(', ') || '',
+        address: addrStr,
+        city: city || parts[parts.length - 1] || '',
+        pincode
+    };
+};
+
 // 1. Verification Endpoint
 app.post('/api/verify', async (req, res) => {
     const name = (req.body.name || '').trim();
@@ -56,32 +125,128 @@ app.post('/api/verify', async (req, res) => {
     
     console.log('🔍 Verification Attempt:', { name, email });
     
+    if (!name || !email) {
+        return res.status(400).json({ success: false, message: 'Name and email are required' });
+    }
+    
     try {
-        // Use a more robust query with collation for case-insensitive matching if possible, 
-        // or just ensure the regex is clean.
-        const employee = await Employee.findOne({ 
-            name: { $regex: new RegExp(`^${name}$`, 'i') },
-            email: { $regex: new RegExp(`^${email}$`, 'i') }
+        const darwinUrl = process.env.DARWINBOX_API_URL;
+        const apiKey = process.env.DARWINBOX_API_KEY;
+        const datasetKey = process.env.DARWINBOX_DATASET_KEY;
+        const userId = process.env.DARWINBOX_USER_ID;
+        const password = process.env.DARWINBOX_PASSWORD;
+        
+        console.log('Calling Darwinbox Employee API for email:', email);
+        const authHeader = 'Basic ' + Buffer.from(`${userId}:${password}`).toString('base64');
+        
+        const dbResponse = await fetch(darwinUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': authHeader
+            },
+            body: JSON.stringify({
+                api_key: apiKey,
+                datasetKey: datasetKey,
+                email_ids: [email]
+            })
         });
         
-        if (employee) {
-            console.log('✅ Employee Verified:', employee.name);
-            // Form email might differ, use exact name matching
-            const existingOrder = await Order.findOne({ 'employeeDetails.name': { $regex: new RegExp(`^${employee.name}$`, 'i') } });
-            console.log('📦 Existing Order Check:', existingOrder ? 'FOUND' : 'NOT FOUND', existingOrder ? existingOrder._id : '');
+        if (!dbResponse.ok) {
+            console.error('Darwinbox API returned status:', dbResponse.status);
+            throw new Error(`Darwinbox API returned status ${dbResponse.status}`);
+        }
+        
+        const dbData = await dbResponse.json();
+        
+        if (dbData.status === 1 && dbData.employee_data && dbData.employee_data.length > 0) {
+            // Find the specific employee in the array matching the input email (case-insensitive)
+            const dbEmployee = dbData.employee_data.find(emp => 
+                emp.company_email_id && emp.company_email_id.toLowerCase().trim() === email.toLowerCase().trim()
+            );
             
-            if (existingOrder) {
-                res.json({ success: true, employee, hasOrder: true, order: existingOrder });
+            if (dbEmployee) {
+                // Compare entered name with Darwinbox full_name
+                const normalizedInputName = name.toLowerCase().replace(/\s+/g, ' ');
+                const normalizedDBName = dbEmployee.full_name.toLowerCase().replace(/\s+/g, ' ');
+                
+                if (normalizedInputName === normalizedDBName) {
+                    console.log('✅ Employee Verified with Darwinbox:', dbEmployee.full_name);
+                    
+                    const parsedAddress = parseAddress(dbEmployee.current_address);
+                    
+                    // Upsert to local MongoDB
+                    const employee = await Employee.findOneAndUpdate(
+                        { email: email.toLowerCase() },
+                        {
+                            name: dbEmployee.full_name,
+                            email: email.toLowerCase(),
+                            dob: dbEmployee.date_of_birth || '',
+                            company: 'Tiger Analytics',
+                            doorNo: parsedAddress.doorNo,
+                            street: parsedAddress.street,
+                            address: parsedAddress.address,
+                            city: parsedAddress.city,
+                            pincode: parsedAddress.pincode,
+                            phone: dbEmployee.primary_mobile_number || ''
+                        },
+                        { upsert: true, new: true }
+                    );
+                    
+                    // Check if an order already exists for this employee
+                    const existingOrder = await Order.findOne({
+                        $or: [
+                            { 'employeeDetails.email': { $regex: new RegExp(`^${email}$`, 'i') } },
+                            { 'employeeDetails.name': { $regex: new RegExp(`^${employee.name}$`, 'i') } }
+                        ]
+                    });
+                    
+                    console.log('📦 Existing Order Check:', existingOrder ? 'FOUND' : 'NOT FOUND');
+                    
+                    return res.json({
+                        success: true,
+                        employee,
+                        hasOrder: !!existingOrder,
+                        order: existingOrder
+                    });
+                } else {
+                    console.log(`❌ Name Mismatch: Entered "${name}" but Darwinbox has "${dbEmployee.full_name}"`);
+                    return res.status(400).json({
+                        success: false,
+                        message: `Name verification failed. Please enter your name exactly as registered (e.g., "${dbEmployee.full_name}").`
+                    });
+                }
             } else {
-                res.json({ success: true, employee, hasOrder: false });
+                console.log('❌ Verification Failed: No matching email found in employee list for:', email);
+                return res.status(404).json({
+                    success: false,
+                    message: 'No employee record found for this email address. Please verify your email.'
+                });
             }
         } else {
-            console.log('❌ Verification Failed: No match found for', { name, email });
-            res.status(404).json({ success: false, message: 'Employee not found or details mismatch' });
+            console.log('❌ Verification Failed: No employee data returned from Darwinbox');
+            return res.status(404).json({
+                success: false,
+                message: 'No employee record found for this email address. Please verify your email.'
+            });
         }
     } catch (err) {
-        console.error('❌ Server Error during verification:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Server Error during verification, falling back to local DB:', err);
+        try {
+            const employee = await Employee.findOne({ 
+                name: { $regex: new RegExp(`^${name}$`, 'i') },
+                email: { $regex: new RegExp(`^${email}$`, 'i') }
+            });
+            
+            if (employee) {
+                console.log('✅ Verified from Local DB Fallback:', employee.name);
+                const existingOrder = await Order.findOne({ 'employeeDetails.email': { $regex: new RegExp(`^${email}$`, 'i') } });
+                return res.json({ success: true, employee, hasOrder: !!existingOrder, order: existingOrder });
+            }
+        } catch (fallbackErr) {
+            console.error('Local fallback failed too:', fallbackErr);
+        }
+        res.status(500).json({ success: false, message: 'Server communication error. Please try again.' });
     }
 });
 

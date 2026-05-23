@@ -9,7 +9,8 @@ const employeeSchema = new mongoose.Schema({
     street: { type: String },
     address: { type: String },
     city: { type: String },
-    pincode: { type: String }
+    pincode: { type: String },
+    phone: { type: String }
 });
 
 module.exports = mongoose.model('Employee', employeeSchema);

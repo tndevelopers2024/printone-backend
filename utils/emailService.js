@@ -9,6 +9,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+
 const sendOrderConfirmation = async (order) => {
     const { employeeDetails, items, shippingAddress } = order;
     
