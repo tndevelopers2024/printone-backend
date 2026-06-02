@@ -2,7 +2,9 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 
 const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+    port: process.env.EMAIL_PORT || 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -507,10 +509,62 @@ const sendNonReceiptNotificationToAdmin = async (order) => {
     }
 };
 
+const sendOtpEmail = async (email, otp) => {
+    const baseStyle = `font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;`;
+    const headerStyle = `background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 30px 20px; text-align: center; border-bottom: 4px solid #f97316;`;
+    const contentStyle = `padding: 40px 30px; color: #475569; line-height: 1.6; text-align: center;`;
+    const titleStyle = `color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 20px;`;
+    const otpCodeStyle = `font-size: 36px; font-weight: 800; color: #f97316; letter-spacing: 0.25em; margin: 30px 0; background-color: #fff7ed; padding: 15px 30px; border-radius: 12px; display: inline-block; border: 1px dashed #fdba74;`;
+    const footerStyle = `background-color: #f1f5f9; padding: 30px 20px; text-align: center; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;`;
+
+    const html = `
+        <div style="background-color: #f4f4f5; padding: 40px 20px;">
+            <div style="${baseStyle}">
+                <div style="${headerStyle}">
+                    <img src="cid:tigerlogo" alt="Tiger Analytics" style="max-height: 55px; width: auto; margin-bottom: 10px;">
+                </div>
+                <div style="${contentStyle}">
+                    <h2 style="${titleStyle}">Verify Your Identity</h2>
+                    <p style="font-size: 16px;">Hello,</p>
+                    <p style="font-size: 16px;">To access the Tiger Onboarding Portal, please enter the following One-Time Password (OTP):</p>
+                    <div style="${otpCodeStyle}">${otp}</div>
+                    <p style="font-size: 14px; color: #64748b;">This OTP is valid for the next 10 minutes. Please do not share this code with anyone.</p>
+                </div>
+                <div style="${footerStyle}">
+                    <p style="margin: 0;">Official Onboarding Portal • Tiger Analytics</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const attachments = [
+        {
+            filename: 'tiger.svg',
+            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            cid: 'tigerlogo'
+        }
+    ];
+
+    try {
+        await transporter.sendMail({
+            from: '"Tiger Tribe" <' + process.env.EMAIL_USER + '>',
+            to: email,
+            subject: `${otp} is your Tiger Onboarding OTP`,
+            html,
+            attachments
+        });
+        console.log(`✅ OTP email sent to ${email}`);
+    } catch (error) {
+        console.error('❌ Error sending OTP email:', error);
+        throw error;
+    }
+};
+
 module.exports = { 
     sendOrderConfirmation, 
     sendStatusUpdateEmail, 
     sendDispatchEmail,
     sendDeliveryConfirmationRequestEmail,
-    sendNonReceiptNotificationToAdmin
+    sendNonReceiptNotificationToAdmin,
+    sendOtpEmail
 };
