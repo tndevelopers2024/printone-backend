@@ -16,7 +16,7 @@ const sendOrderConfirmation = async (order) => {
     const { employeeDetails, items, shippingAddress } = order;
     
     // Format items into a styled list
-    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}</li>`).join('');
+    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}${item.selectedSize ? ` (Size: ${item.selectedSize})` : ''}</li>`).join('');
 
     const baseStyle = `font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;`;
     const headerStyle = `background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 30px 20px; text-align: center; border-bottom: 4px solid #f97316;`;
@@ -120,10 +120,7 @@ const sendOrderConfirmation = async (order) => {
                             <span style="${labelStyle}">Employee Email</span>
                             <p style="${valueStyle}">${employeeDetails.email}</p>
                         </div>
-                        <div style="margin-bottom: 15px;">
-                            <span style="${labelStyle}">Status</span>
-                            <p style="${valueStyle}; color: #16a34a;">Ready for Dispatch</p>
-                        </div>
+
                         <div>
                             <span style="${labelStyle}">Selected Bundle</span>
                             <p style="${valueStyle}">${items.length} Items Selected</p>
@@ -144,8 +141,8 @@ const sendOrderConfirmation = async (order) => {
 
     const attachments = [
         {
-            filename: 'tiger.svg',
-            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            filename: 'tiger.png',
+            path: path.join(__dirname, '../../frontend/public/tiger.png'),
             cid: 'tigerlogo'
         },
         {
@@ -158,7 +155,7 @@ const sendOrderConfirmation = async (order) => {
     try {
         // Send Employee Confirmation
         await transporter.sendMail({
-            from: '"Tiger Tribe" <' + process.env.EMAIL_USER + '>',
+            from: '"Tiger Analytics" <' + process.env.EMAIL_USER + '>',
             to: employeeDetails.email,
             subject: "Welcome to the Tribe! Your Gear is on the way",
             html: employeeHtml,
@@ -192,7 +189,7 @@ const sendOrderConfirmation = async (order) => {
 const sendStatusUpdateEmail = async (order) => {
     const { employeeDetails, status, items } = order;
     
-    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}</li>`).join('');
+    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}${item.selectedSize ? ` (Size: ${item.selectedSize})` : ''}</li>`).join('');
 
     const baseStyle = `font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;`;
     const headerStyle = `background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 30px 20px; text-align: center; border-bottom: 4px solid #3b82f6;`;
@@ -200,6 +197,8 @@ const sendStatusUpdateEmail = async (order) => {
     const titleStyle = `color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 20px; text-align: center;`;
     const sectionStyle = `background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 0 8px 8px 0; margin: 25px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);`;
     const footerStyle = `background-color: #f1f5f9; padding: 30px 20px; text-align: center; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;`;
+    const labelStyle = `font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;`;
+    const valueStyle = `font-size: 16px; color: #0f172a; font-weight: 500; margin: 0;`;
 
     const headerHtml = `
         <div style="${headerStyle}">
@@ -238,10 +237,35 @@ const sendStatusUpdateEmail = async (order) => {
         </div>
     `;
 
+    const adminHtml = `
+        <div style="background-color: #f4f4f5; padding: 40px 20px;">
+            <div style="${baseStyle}">
+                ${headerHtml}
+                <div style="${contentStyle}">
+                    <h2 style="${titleStyle}">Order Processing ⏳</h2>
+                    <p style="font-size: 16px;">The order for <strong style="color: #0f172a;">${employeeDetails.name}</strong> is now being <strong>${status}</strong>.</p>
+                    
+                    <div style="${sectionStyle}">
+                        <div style="margin-bottom: 15px;">
+                            <span style="${labelStyle}">Employee Email</span>
+                            <p style="${valueStyle}">${employeeDetails.email}</p>
+                        </div>
+                    </div>
+
+                    <div style="${sectionStyle}">
+                        <span style="${labelStyle}">Order Items</span>
+                        <ul style="list-style: none; padding: 0; margin: 10px 0 0 0;">${itemsList}</ul>
+                    </div>
+                </div>
+                ${footerHtml}
+            </div>
+        </div>
+    `;
+
     const attachments = [
         {
-            filename: 'tiger.svg',
-            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            filename: 'tiger.png',
+            path: path.join(__dirname, '../../frontend/public/tiger.png'),
             cid: 'tigerlogo'
         },
         {
@@ -254,7 +278,7 @@ const sendStatusUpdateEmail = async (order) => {
     try {
         // Send to Employee
         await transporter.sendMail({
-            from: '"Tiger Tribe" <' + process.env.EMAIL_USER + '>',
+            from: '"Tiger Analytics" <' + process.env.EMAIL_USER + '>',
             to: employeeDetails.email,
             subject: `Order Update: Your gear is now being processed!`,
             html: html,
@@ -266,7 +290,7 @@ const sendStatusUpdateEmail = async (order) => {
             from: '"Order Portal" <' + process.env.EMAIL_USER + '>',
             to: process.env.ADMIN_EMAIL_TIGER,
             subject: `Processing Update: ${employeeDetails.name}`,
-            html: html,
+            html: adminHtml,
             attachments
         });
 
@@ -279,7 +303,7 @@ const sendStatusUpdateEmail = async (order) => {
 const sendDispatchEmail = async (order) => {
     const { employeeDetails, status, items, trackingLink } = order;
     
-    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}</li>`).join('');
+    const itemsList = items.map(item => `<li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0; color: #334155; font-weight: 500;">✓ ${item.title}${item.selectedSize ? ` (Size: ${item.selectedSize})` : ''}</li>`).join('');
 
     const baseStyle = `font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;`;
     const headerStyle = `background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 30px 20px; text-align: center; border-bottom: 4px solid #f97316;`;
@@ -287,6 +311,8 @@ const sendDispatchEmail = async (order) => {
     const titleStyle = `color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 20px; text-align: center;`;
     const sectionStyle = `background-color: #f8fafc; border-left: 4px solid #f97316; padding: 20px; border-radius: 0 8px 8px 0; margin: 25px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);`;
     const footerStyle = `background-color: #f1f5f9; padding: 30px 20px; text-align: center; color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0;`;
+    const labelStyle = `font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px;`;
+    const valueStyle = `font-size: 16px; color: #0f172a; font-weight: 500; margin: 0;`;
 
     const headerHtml = `
         <div style="${headerStyle}">
@@ -333,10 +359,41 @@ const sendDispatchEmail = async (order) => {
         </div>
     `;
 
+    const adminHtml = `
+        <div style="background-color: #f4f4f5; padding: 40px 20px;">
+            <div style="${baseStyle}">
+                ${headerHtml}
+                <div style="${contentStyle}">
+                    <h2 style="${titleStyle}">Order Dispatched 🚚</h2>
+                    <p style="font-size: 16px;">The order for <strong style="color: #0f172a;">${employeeDetails.name}</strong> has been <strong>${status}</strong>.</p>
+                    
+                    <div style="${sectionStyle}">
+                        <div style="margin-bottom: 15px;">
+                            <span style="${labelStyle}">Employee Email</span>
+                            <p style="${valueStyle}">${employeeDetails.email}</p>
+                        </div>
+                        ${trackingLink ? `
+                        <div>
+                            <span style="${labelStyle}">Tracking Link</span>
+                            <p style="${valueStyle}"><a href="${trackingLink}">${trackingLink}</a></p>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <div style="${sectionStyle}">
+                        <span style="${labelStyle}">Order Items</span>
+                        <ul style="list-style: none; padding: 0; margin: 10px 0 0 0;">${itemsList}</ul>
+                    </div>
+                </div>
+                ${footerHtml}
+            </div>
+        </div>
+    `;
+
     const attachments = [
         {
-            filename: 'tiger.svg',
-            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            filename: 'tiger.png',
+            path: path.join(__dirname, '../../frontend/public/tiger.png'),
             cid: 'tigerlogo'
         },
         {
@@ -349,7 +406,7 @@ const sendDispatchEmail = async (order) => {
     try {
         // Send to Employee
         await transporter.sendMail({
-            from: '"Tiger Tribe" <' + process.env.EMAIL_USER + '>',
+            from: '"Tiger Analytics" <' + process.env.EMAIL_USER + '>',
             to: employeeDetails.email,
             subject: `Dispatch Update: Your gear is on the way!`,
             html: html,
@@ -361,7 +418,7 @@ const sendDispatchEmail = async (order) => {
             from: '"Order Portal" <' + process.env.EMAIL_USER + '>',
             to: process.env.ADMIN_EMAIL_TIGER,
             subject: `Dispatch Update: ${employeeDetails.name}`,
-            html: html,
+            html: adminHtml,
             attachments
         });
 
@@ -407,15 +464,15 @@ const sendDeliveryConfirmationRequestEmail = async (order) => {
 
     const attachments = [
         {
-            filename: 'tiger.svg',
-            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            filename: 'tiger.png',
+            path: path.join(__dirname, '../../frontend/public/tiger.png'),
             cid: 'tigerlogo'
         }
     ];
 
     try {
         await transporter.sendMail({
-            from: '"Tiger Tribe Support" <' + process.env.EMAIL_USER + '>',
+            from: '"Tiger Analytics Support" <' + process.env.EMAIL_USER + '>',
             to: employeeDetails.email,
             subject: "Quick Check: Has your onboarding kit arrived?",
             html: html,
@@ -539,15 +596,15 @@ const sendOtpEmail = async (email, otp) => {
 
     const attachments = [
         {
-            filename: 'tiger.svg',
-            path: path.join(__dirname, '../../frontend/public/tiger.svg'),
+            filename: 'tiger.png',
+            path: path.join(__dirname, '../../frontend/public/tiger.png'),
             cid: 'tigerlogo'
         }
     ];
 
     try {
         await transporter.sendMail({
-            from: '"Tiger Tribe" <' + process.env.EMAIL_USER + '>',
+            from: '"Tiger Analytics" <' + process.env.EMAIL_USER + '>',
             to: email,
             subject: `${otp} is your Tiger Onboarding OTP`,
             html,

@@ -7,11 +7,12 @@ const Employee = require('./models/Employee');
 const Kit = require('./models/Kit');
 const Order = require('./models/Order');
 const Otp = require('./models/Otp');
-const { 
-    sendOrderConfirmation, 
-    sendStatusUpdateEmail, 
-    sendDispatchEmail, 
-    sendDeliveryConfirmationRequestEmail, 
+const Inventory = require('./models/Inventory');
+const {
+    sendOrderConfirmation,
+    sendStatusUpdateEmail,
+    sendDispatchEmail,
+    sendDeliveryConfirmationRequestEmail,
     sendNonReceiptNotificationToAdmin,
     sendOtpEmail
 } = require('./utils/emailService');
@@ -41,7 +42,7 @@ app.get('/api/employees', async (req, res) => {
 // 0. Unified Admin Login (SuperAdmin & Tiger Analytics)
 app.post('/api/admin/login', (req, res) => {
     const { email, password } = req.body;
-    
+
     if (email === 'superadmin@printone.com' && password === 'printone@2026') {
         res.json({ success: true, user: { email, role: 'superadmin' } });
     } else if (email === 'tiger@printone.com' && password === 'tiger@2026') {
@@ -56,6 +57,53 @@ app.get('/api/kits', async (req, res) => {
     try {
         const kits = await Kit.find().sort({ order: 1 });
         res.json(kits);
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Inventory Endpoints
+app.get('/api/inventory', async (req, res) => {
+    try {
+        let inventory = await Inventory.find().sort({ itemName: 1 });
+
+        // Auto-seed fixed products if inventory is empty
+        if (inventory.length === 0) {
+            const fixedItems = [
+                { itemName: 'Message Inserts', quantity: 0 },
+                { itemName: 'Lanyard with Dual Card Holder', quantity: 0 },
+                { itemName: 'Eco Sticky Note Pad with Ball Pen', quantity: 0 },
+                { itemName: 'Tiger Branded Polo T-Shirt', quantity: 0, hasSizes: true, sizes: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 } },
+                { itemName: 'Stainless Steel Sipper Bottle', quantity: 0 },
+                { itemName: 'Customized Desk Mat', quantity: 0 },
+                { itemName: 'Portable Laptop Stand', quantity: 0 },
+                { itemName: 'Emmi Backpack', quantity: 0 },
+                { itemName: 'Premium Messenger Leather Bag', quantity: 0 }
+            ];
+            await Inventory.insertMany(fixedItems);
+            inventory = await Inventory.find().sort({ itemName: 1 });
+        }
+
+        res.json(inventory);
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+app.patch('/api/inventory/:id', async (req, res) => {
+    try {
+        const { quantity, sizes } = req.body;
+        const updateData = {};
+        if (quantity !== undefined) updateData.quantity = quantity;
+        if (sizes !== undefined) updateData.sizes = sizes;
+
+        const item = await Inventory.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true }
+        );
+        if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
+        res.json({ success: true, item });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -84,19 +132,19 @@ const parseAddress = (addrStr) => {
     const parts = cleanStr.split(',').map(p => p.trim()).filter(Boolean);
 
     const knownStates = [
-        'haryana','karnataka','tamil nadu','telangana','maharashtra',
-        'delhi','uttar pradesh','andhra pradesh','rajasthan','gujarat',
-        'kerala','odisha','west bengal','bihar','pondicherry','puducherry',
-        'goa','assam','punjab','himachal pradesh','uttarakhand','jharkhand',
-        'chhattisgarh','tripura','meghalaya','manipur','nagaland','sikkim',
-        'arunachal pradesh','mizoram'
+        'haryana', 'karnataka', 'tamil nadu', 'telangana', 'maharashtra',
+        'delhi', 'uttar pradesh', 'andhra pradesh', 'rajasthan', 'gujarat',
+        'kerala', 'odisha', 'west bengal', 'bihar', 'pondicherry', 'puducherry',
+        'goa', 'assam', 'punjab', 'himachal pradesh', 'uttarakhand', 'jharkhand',
+        'chhattisgarh', 'tripura', 'meghalaya', 'manipur', 'nagaland', 'sikkim',
+        'arunachal pradesh', 'mizoram'
     ];
 
     // Filter out state names from parts
     const filteredParts = parts.filter(p => !knownStates.includes(p.toLowerCase()));
 
     let doorNo = filteredParts[0] || '';
-    let city   = filteredParts[filteredParts.length - 1] || '';
+    let city = filteredParts[filteredParts.length - 1] || '';
     let street = filteredParts.slice(1, -1).join(', ');
 
     // If only 2 parts, street = second part, city = last
@@ -124,7 +172,7 @@ const getEmployeeRecord = async (email) => {
         if (fs.existsSync(mockPath)) {
             const mockData = JSON.parse(fs.readFileSync(mockPath, 'utf8'));
             if (mockData && mockData.employee_data) {
-                const mockEmp = mockData.employee_data.find(emp => 
+                const mockEmp = mockData.employee_data.find(emp =>
                     emp.company_email_id && emp.company_email_id.toLowerCase().trim() === email.toLowerCase().trim()
                 );
                 if (mockEmp) {
@@ -133,17 +181,17 @@ const getEmployeeRecord = async (email) => {
                 }
             }
         }
-        
+
         // --- 2. Call real Darwinbox API ---
         const darwinUrl = process.env.DARWINBOX_API_URL;
         const apiKey = process.env.DARWINBOX_API_KEY;
         const datasetKey = process.env.DARWINBOX_DATASET_KEY;
         const userId = process.env.DARWINBOX_USER_ID;
         const password = process.env.DARWINBOX_PASSWORD;
-        
+
         console.log('Calling Darwinbox Employee API for email:', email);
         const authHeader = 'Basic ' + Buffer.from(`${userId}:${password}`).toString('base64');
-        
+
         const dbResponse = await fetch(darwinUrl, {
             method: 'POST',
             headers: {
@@ -156,11 +204,11 @@ const getEmployeeRecord = async (email) => {
                 email_ids: [email]
             })
         });
-        
+
         if (dbResponse.ok) {
             const dbData = await dbResponse.json();
             if (dbData.status === 1 && dbData.employee_data && dbData.employee_data.length > 0) {
-                const dbEmployee = dbData.employee_data.find(emp => 
+                const dbEmployee = dbData.employee_data.find(emp =>
                     emp.company_email_id && emp.company_email_id.toLowerCase().trim() === email.toLowerCase().trim()
                 );
                 if (dbEmployee) return { source: 'darwinbox', data: dbEmployee };
@@ -169,20 +217,20 @@ const getEmployeeRecord = async (email) => {
     } catch (err) {
         console.error('Darwinbox API search error:', err);
     }
-    
+
     // Fallback to local DB
     const localEmployee = await Employee.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
     if (localEmployee) {
         return { source: 'local', data: localEmployee };
     }
-    
+
     return null;
 };
 
 // 1. Send OTP Endpoint
 app.post('/api/send-otp', async (req, res) => {
     const email = (req.body.email || '').trim().toLowerCase();
-    
+
     try {
         const employeeRecord = await getEmployeeRecord(email);
         if (!employeeRecord) {
@@ -201,7 +249,6 @@ app.post('/api/send-otp', async (req, res) => {
             }
         }
 
-        // ── Joining Date Check ──
         const rawDate = employeeRecord.source === 'darwinbox'
             ? employeeRecord.data.date_of_joining
             : employeeRecord.data.joiningDate;
@@ -327,12 +374,12 @@ app.post('/api/verify-otp', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
     try {
         const orderData = req.body;
-        
+
         // Check if order already exists for this email
         const existingOrder = await Order.findOne({
             'employeeDetails.email': { $regex: new RegExp(`^${orderData.employeeDetails.email}$`, 'i') }
         });
-        
+
         if (existingOrder) {
             return res.status(400).json({ success: false, message: 'An order has already been placed for this employee.' });
         }
@@ -342,12 +389,47 @@ app.post('/api/orders', async (req, res) => {
             status: 'Processing',
             statusHistory: [{ status: 'Processing', updatedAt: new Date() }]
         });
-        
+
         await newOrder.save();
-        
+
+        // Deduct inventory
+        if (orderData.items && orderData.items.length > 0) {
+            const mapTitleToInventory = (title) => {
+                const t = title.toLowerCase();
+                if (t.includes('polo t-shirt')) return 'Tiger Branded Polo T-Shirt';
+                if (t.includes('sipper bottle')) return 'Stainless Steel Sipper Bottle';
+                if (t.includes('messenger leather bag')) return 'Premium Messenger Leather Bag';
+                if (t.includes('lanyard')) return 'Lanyard with Dual Card Holder';
+                if (t.includes('sticky note')) return 'Eco Sticky Note Pad with Ball Pen';
+                if (t.includes('message insert')) return 'Message Inserts';
+                if (t.includes('desk mat')) return 'Customized Desk Mat';
+                if (t.includes('laptop stand')) return 'Portable Laptop Stand';
+                if (t.includes('backpack')) return 'Emmi Backpack';
+                return title;
+            };
+
+            for (const kit of orderData.items) {
+                const searchName = mapTitleToInventory(kit.title);
+                // Find matching inventory item by name
+                const invItem = await Inventory.findOne({ itemName: { $regex: new RegExp(`^${searchName}$`, 'i') } });
+                if (invItem) {
+                    if (invItem.hasSizes && kit.selectedSize) {
+                        if (invItem.sizes && invItem.sizes[kit.selectedSize] !== undefined) {
+                            invItem.sizes[kit.selectedSize] = Math.max(0, invItem.sizes[kit.selectedSize] - 1);
+                            invItem.markModified('sizes');
+                            await invItem.save();
+                        }
+                    } else if (!invItem.hasSizes) {
+                        invItem.quantity = Math.max(0, invItem.quantity - 1);
+                        await invItem.save();
+                    }
+                }
+            }
+        }
+
         // Send order confirmation email
         sendOrderConfirmation(newOrder).catch(err => console.error('Order email failed:', err));
-        
+
         res.status(201).json({ success: true, order: newOrder });
     } catch (err) {
         console.error('Create Order Error:', err);
@@ -375,7 +457,7 @@ app.patch('/api/orders/:id', async (req, res) => {
             order.status = req.body.status;
             order.statusHistory.push({ status: req.body.status, updatedAt: new Date() });
         }
-        
+
         if (req.body.isDelivered !== undefined) {
             order.isDelivered = req.body.isDelivered;
             if (req.body.isDelivered) {
@@ -412,7 +494,7 @@ app.patch('/api/orders/:id', async (req, res) => {
 app.get('/api/orders/track', async (req, res) => {
     try {
         const name = req.query.name;
-        const order = await Order.findOne({ 
+        const order = await Order.findOne({
             'employeeDetails.name': { $regex: new RegExp(`^${name}$`, 'i') }
         });
         if (order) {
@@ -429,7 +511,7 @@ app.get('/api/orders/track', async (req, res) => {
 app.get('/api/orders/public-confirm/:id/:action', async (req, res) => {
     const { id, action } = req.params;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    
+
     try {
         const order = await Order.findById(id);
         if (!order) {
