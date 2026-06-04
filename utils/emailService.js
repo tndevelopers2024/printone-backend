@@ -142,12 +142,12 @@ const sendOrderConfirmation = async (order) => {
     const attachments = [
         {
             filename: 'tiger.png',
-            path: path.join(__dirname, '../../frontend/public/tiger.png'),
+            path: path.join(__dirname, '../assets/tiger.png'),
             cid: 'tigerlogo'
         },
         {
             filename: 'printone-logo.png',
-            path: path.join(__dirname, '../../frontend/public/printone-logo.png'),
+            path: path.join(__dirname, '../assets/printone-logo.png'),
             cid: 'printonelogo'
         }
     ];
@@ -265,12 +265,12 @@ const sendStatusUpdateEmail = async (order) => {
     const attachments = [
         {
             filename: 'tiger.png',
-            path: path.join(__dirname, '../../frontend/public/tiger.png'),
+            path: path.join(__dirname, '../assets/tiger.png'),
             cid: 'tigerlogo'
         },
         {
             filename: 'printone-logo.png',
-            path: path.join(__dirname, '../../frontend/public/printone-logo.png'),
+            path: path.join(__dirname, '../assets/printone-logo.png'),
             cid: 'printonelogo'
         }
     ];
@@ -393,12 +393,12 @@ const sendDispatchEmail = async (order) => {
     const attachments = [
         {
             filename: 'tiger.png',
-            path: path.join(__dirname, '../../frontend/public/tiger.png'),
+            path: path.join(__dirname, '../assets/tiger.png'),
             cid: 'tigerlogo'
         },
         {
             filename: 'printone-logo.png',
-            path: path.join(__dirname, '../../frontend/public/printone-logo.png'),
+            path: path.join(__dirname, '../assets/printone-logo.png'),
             cid: 'printonelogo'
         }
     ];
@@ -465,7 +465,7 @@ const sendDeliveryConfirmationRequestEmail = async (order) => {
     const attachments = [
         {
             filename: 'tiger.png',
-            path: path.join(__dirname, '../../frontend/public/tiger.png'),
+            path: path.join(__dirname, '../assets/tiger.png'),
             cid: 'tigerlogo'
         }
     ];
@@ -597,7 +597,7 @@ const sendOtpEmail = async (email, otp) => {
     const attachments = [
         {
             filename: 'tiger.png',
-            path: path.join(__dirname, '../../frontend/public/tiger.png'),
+            path: path.join(__dirname, '../assets/tiger.png'),
             cid: 'tigerlogo'
         }
     ];
