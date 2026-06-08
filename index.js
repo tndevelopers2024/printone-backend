@@ -386,8 +386,8 @@ app.post('/api/orders', async (req, res) => {
 
         const newOrder = new Order({
             ...orderData,
-            status: 'Processing',
-            statusHistory: [{ status: 'Processing', updatedAt: new Date() }]
+            status: 'Pending',
+            statusHistory: [{ status: 'Pending', updatedAt: new Date() }]
         });
 
         await newOrder.save();
