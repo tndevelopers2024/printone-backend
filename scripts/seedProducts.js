@@ -4,13 +4,6 @@ const Kit = require('../models/Kit');
 
 const products = [
     {
-        title: "Message Inserts",
-        description: "Official welcome letter from the Tiger Analytics leadership team with orientation guidelines.",
-        image: "/images/image.png",
-        category: "Standard",
-        items: ["Welcome Card", "Tiger Sticker Pack"]
-    },
-    {
         title: "Lanyard with Dual Card Holder",
         description: "Premium branded lanyard with a transparent dual-side ID card holder.",
         image: "/images/image2.png",
@@ -60,7 +53,7 @@ const products = [
         items: ["Backpack", "Rain Cover"]
     },
     {
-        title: "Premium Messenger Leather Bag",
+        title: "Kenneth Cole messenger bag",
         description: "Executive leather messenger bag with magnetic clasp and organized storage.",
         image: "/images/image9.png",
         category: "Choice_B",

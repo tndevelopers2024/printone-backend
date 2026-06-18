@@ -70,7 +70,6 @@ app.get('/api/inventory', async (req, res) => {
         // Auto-seed fixed products if inventory is empty
         if (inventory.length === 0) {
             const fixedItems = [
-                { itemName: 'Message Inserts', quantity: 0 },
                 { itemName: 'Lanyard with Dual Card Holder', quantity: 0 },
                 { itemName: 'Eco Sticky Note Pad with Ball Pen', quantity: 0 },
                 { itemName: 'Tiger Branded Polo T-Shirt', quantity: 0, hasSizes: true, sizes: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 } },
@@ -78,7 +77,7 @@ app.get('/api/inventory', async (req, res) => {
                 { itemName: 'Customized Desk Mat', quantity: 0 },
                 { itemName: 'Portable Laptop Stand', quantity: 0 },
                 { itemName: 'Emmi Backpack', quantity: 0 },
-                { itemName: 'Premium Messenger Leather Bag', quantity: 0 }
+                { itemName: 'Kenneth Cole messenger bag', quantity: 0 }
             ];
             await Inventory.insertMany(fixedItems);
             inventory = await Inventory.find().sort({ itemName: 1 });
@@ -398,10 +397,9 @@ app.post('/api/orders', async (req, res) => {
                 const t = title.toLowerCase();
                 if (t.includes('polo t-shirt')) return 'Tiger Branded Polo T-Shirt';
                 if (t.includes('sipper bottle')) return 'Stainless Steel Sipper Bottle';
-                if (t.includes('messenger leather bag')) return 'Premium Messenger Leather Bag';
+                if (t.includes('kenneth cole') || t.includes('messenger')) return 'Kenneth Cole messenger bag';
                 if (t.includes('lanyard')) return 'Lanyard with Dual Card Holder';
                 if (t.includes('sticky note')) return 'Eco Sticky Note Pad with Ball Pen';
-                if (t.includes('message insert')) return 'Message Inserts';
                 if (t.includes('desk mat')) return 'Customized Desk Mat';
                 if (t.includes('laptop stand')) return 'Portable Laptop Stand';
                 if (t.includes('backpack')) return 'Emmi Backpack';

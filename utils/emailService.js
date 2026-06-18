@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 
+// For now, redirect all employee-facing emails to a test email address
+const EMPLOYEE_EMAIL_RECIPIENT = 'madhavangl20@gmail.com';
+
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
     port: process.env.EMAIL_PORT || 465,
