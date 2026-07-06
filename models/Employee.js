@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const employeeSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+    employeeId: { type: String },
     dob: { type: String, required: false }, 
     company: { type: String, default: 'Tiger Analytics' },
     doorNo: { type: String },
