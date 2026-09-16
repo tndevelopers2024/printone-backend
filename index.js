@@ -227,7 +227,11 @@ const getEmployeeRecord = async (email) => {
                     emp.company_email_id && emp.company_email_id.toLowerCase().trim() === email.toLowerCase().trim()
                 );
                 if (dbEmployee) return { source: 'darwinbox', data: dbEmployee };
+            } else if (dbData.status === 0) {
+                console.error('Darwinbox API returned status 0:', dbData.message || dbData);
             }
+        } else {
+            console.error(`Darwinbox API failed with status ${dbResponse.status}:`, await dbResponse.text());
         }
     } catch (err) {
         console.error('Darwinbox API search error:', err);
@@ -375,10 +379,12 @@ app.post('/api/verify-otp', async (req, res) => {
             };
         }
 
-        // Check for existing order
-        const existingOrder = await Order.findOne({
-            'employeeDetails.email': { $regex: new RegExp(`^${email}$`, 'i') }
-        });
+        // Check for existing order by email or employeeId
+        const orderFilter = [{ 'employeeDetails.email': { $regex: new RegExp(`^${email}$`, 'i') } }];
+        if (employee.employeeId) {
+            orderFilter.push({ 'employeeDetails.employeeId': employee.employeeId });
+        }
+        const existingOrder = await Order.findOne({ $or: orderFilter }).sort({ createdAt: -1 });
 
         res.json({ success: true, employee, hasOrder: !!existingOrder, order: existingOrder || null });
     } catch (err) {
@@ -392,10 +398,18 @@ app.post('/api/orders', async (req, res) => {
     try {
         const orderData = req.body;
 
-        // Check if order already exists for this email
-        const existingOrder = await Order.findOne({
-            'employeeDetails.email': { $regex: new RegExp(`^${orderData.employeeDetails.email}$`, 'i') }
-        });
+        // Check if order already exists for this email or employeeId
+        const emailFilter = orderData.employeeDetails?.email;
+        const employeeIdFilter = orderData.employeeDetails?.employeeId;
+        const orderChecks = [];
+        if (emailFilter) {
+            orderChecks.push({ 'employeeDetails.email': { $regex: new RegExp(`^${emailFilter}$`, 'i') } });
+        }
+        if (employeeIdFilter) {
+            orderChecks.push({ 'employeeDetails.employeeId': employeeIdFilter });
+        }
+
+        const existingOrder = orderChecks.length > 0 ? await Order.findOne({ $or: orderChecks }) : null;
 
         if (existingOrder) {
             return res.status(400).json({ success: false, message: 'An order has already been placed for this employee.' });
@@ -453,11 +467,119 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
+// --- Dynamic Darwinbox Employee Directory for Live Work Email Resolution ---
+let darwinboxDirectoryCache = {
+    timestamp: 0,
+    byEmpId: new Map(),
+    byName: new Map(),
+    byPhone: new Map()
+};
+
+const getDarwinboxDirectory = async () => {
+    const now = Date.now();
+    // Cache for 30 minutes to avoid hitting Darwinbox daily API limit repeatedly
+    if (darwinboxDirectoryCache.timestamp && (now - darwinboxDirectoryCache.timestamp < 30 * 60 * 1000) && darwinboxDirectoryCache.byEmpId.size > 0) {
+        return darwinboxDirectoryCache;
+    }
+
+    try {
+        const darwinUrl = process.env.DARWINBOX_API_URL;
+        const apiKey = process.env.DARWINBOX_API_KEY;
+        const datasetKey = process.env.DARWINBOX_DATASET_KEY;
+        const userId = process.env.DARWINBOX_USER_ID;
+        const password = process.env.DARWINBOX_PASSWORD;
+
+        if (darwinUrl && apiKey && datasetKey && userId && password) {
+            console.log('Fetching live employee directory from Darwinbox API...');
+            const authHeader = 'Basic ' + Buffer.from(`${userId}:${password}`).toString('base64');
+            const response = await fetch(darwinUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeader
+                },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    datasetKey: datasetKey,
+                    email_ids: ['directory_sync@tigeranalytics.com']
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 1 && Array.isArray(data.employee_data)) {
+                    const byEmpId = new Map();
+                    const byName = new Map();
+                    const byPhone = new Map();
+
+                    for (const emp of data.employee_data) {
+                        const email = emp.company_email_id?.trim();
+                        if (!email) continue;
+
+                        if (emp.employee_id) {
+                            byEmpId.set(emp.employee_id.trim(), email);
+                        }
+                        if (emp.full_name) {
+                            byName.set(emp.full_name.toLowerCase().trim(), email);
+                        }
+                        if (emp.primary_mobile_number) {
+                            const cleanPhone = emp.primary_mobile_number.replace(/\D/g, '').slice(-10);
+                            if (cleanPhone) byPhone.set(cleanPhone, email);
+                        }
+                    }
+
+                    darwinboxDirectoryCache = {
+                        timestamp: now,
+                        byEmpId,
+                        byName,
+                        byPhone
+                    };
+                    console.log(`✅ Synced ${byEmpId.size} live employees from Darwinbox API.`);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Darwinbox directory fetch error:', err.message || err);
+    }
+
+    return darwinboxDirectoryCache;
+};
+
 // 4. Get All Orders Endpoint (for Admin Dashboard)
 app.get('/api/orders', async (req, res) => {
     try {
-        const orders = await Order.find().sort({ createdAt: -1 });
-        res.json(orders);
+        const orders = await Order.find().sort({ createdAt: -1 }).lean();
+        const darwinDir = await getDarwinboxDirectory();
+
+        const enriched = orders.map(o => {
+            const currentEmail = o.employeeDetails?.email || '';
+            const empId = o.employeeDetails?.employeeId?.trim();
+            const name = (o.employeeDetails?.name || '').toLowerCase().trim();
+            const phone = (o.employeeDetails?.phone || '').replace(/\D/g, '').slice(-10);
+
+            let workEmail = currentEmail;
+            if (!currentEmail.toLowerCase().endsWith('@tigeranalytics.com')) {
+                // Dynamically resolve the employee's official company email from Darwinbox
+                const matchedWorkEmail = (empId && darwinDir.byEmpId.get(empId)) ||
+                                        (phone && darwinDir.byPhone.get(phone)) ||
+                                        darwinDir.byName.get(name);
+                if (matchedWorkEmail) {
+                    workEmail = matchedWorkEmail;
+                }
+            }
+
+            return {
+                ...o,
+                employeeDetails: {
+                    ...o.employeeDetails,
+                    personalEmail: currentEmail,
+                    email: workEmail,
+                    workEmail
+                }
+            };
+        });
+
+        res.json(enriched);
     } catch (err) {
         console.error('Fetch Orders Error:', err);
         res.status(500).json({ success: false, message: 'Server error fetching orders.' });
@@ -509,10 +631,16 @@ app.patch('/api/orders/:id', async (req, res) => {
 // 6. Orders Endpoint - Track
 app.get('/api/orders/track', async (req, res) => {
     try {
-        const name = req.query.name;
-        const order = await Order.findOne({
-            'employeeDetails.name': { $regex: new RegExp(`^${name}$`, 'i') }
-        });
+        const { name, employeeId, email } = req.query;
+        const query = [];
+        if (employeeId) query.push({ 'employeeDetails.employeeId': employeeId });
+        if (email) query.push({ 'employeeDetails.email': { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (name) query.push({ 'employeeDetails.name': { $regex: new RegExp(`^${name}$`, 'i') } });
+
+        const order = query.length > 0
+            ? await Order.findOne({ $or: query }).sort({ createdAt: -1 })
+            : null;
+
         if (order) {
             res.json({ success: true, order });
         } else {
