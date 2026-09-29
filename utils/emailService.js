@@ -9,8 +9,8 @@ const transporter = nodemailer.createTransport({
     port: process.env.EMAIL_PORT || 465,
     secure: true,
     auth: {
-        user: 'printoneadmin@printone.co.in',
-        pass: 'CuJ#pZ|C5#'
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
 });
 
